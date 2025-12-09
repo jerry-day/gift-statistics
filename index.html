@@ -829,6 +829,18 @@
       appConfig.gistId = document.getElementById('gistId').value.trim();
       appConfig.githubToken = document.getElementById('githubToken').value.trim();
       
+      // 验证Gist ID格式
+      if (appConfig.gistId && !/^[a-f0-9]{32}$/.test(appConfig.gistId)) {
+        showToast('Gist ID格式不正确，应为32位十六进制字符串', 'error');
+        // 不阻止保存，让用户可以继续
+      }
+      
+      // 验证Token格式（GitHub Token通常是40位十六进制字符串）
+      if (appConfig.githubToken && !/^[a-f0-9]{40}$/.test(appConfig.githubToken)) {
+        showToast('GitHub Token格式不正确，应为40位十六进制字符串', 'error');
+        // 不阻止保存，让用户可以继续
+      }
+      
       // 保存到本地存储
       localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
       
@@ -1015,7 +1027,20 @@
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // 获取详细错误信息
+          let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const errorData = await response.json();
+            if (errorData.message) {
+              errorMsg += ` - ${errorData.message}`;
+            }
+            if (errorData.documentation_url) {
+              errorMsg += ` (查看: ${errorData.documentation_url})`;
+            }
+          } catch (e) {
+            // 如果无法解析JSON，使用默认错误信息
+          }
+          throw new Error(errorMsg);
         }
         
         syncStatus.className = 'mt-3 text-xs text-center text-green-600';
@@ -1059,7 +1084,20 @@
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // 获取详细错误信息
+          let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const errorData = await response.json();
+            if (errorData.message) {
+              errorMsg += ` - ${errorData.message}`;
+            }
+            if (errorData.documentation_url) {
+              errorMsg += ` (查看: ${errorData.documentation_url})`;
+            }
+          } catch (e) {
+            // 如果无法解析JSON，使用默认错误信息
+          }
+          throw new Error(errorMsg);
         }
         
         const gistData = await response.json();
