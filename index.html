@@ -6,10 +6,35 @@
   <title>礼物记录追踪器</title>
   <!-- Tailwind CSS v3 -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Font Awesome -->
-  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- Font Awesome - 添加fallback -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css';">
+  <!-- Chart.js - 添加fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.8/chart.umd.min.js';"></script>
+  <!-- 移动端兼容性优化 -->
+  <script>
+    // 捕获全局JavaScript错误，防止移动端浏览器因错误而停止执行
+    window.addEventListener('error', function(e) {
+      console.error('JavaScript错误:', e.error);
+      e.preventDefault();
+    });
+    
+    // 添加触摸事件支持
+    document.addEventListener('DOMContentLoaded', function() {
+      // 为所有按钮添加触摸反馈
+      document.querySelectorAll('button').forEach(button => {
+        button.addEventListener('touchstart', function() {
+          this.style.transform = 'scale(0.95)';
+        });
+        button.addEventListener('touchend', function() {
+          this.style.transform = 'scale(1)';
+        });
+        button.addEventListener('touchcancel', function() {
+          this.style.transform = 'scale(1)';
+        });
+      });
+    });
+  </script>
+  
   <!-- 统一的 Tailwind 配置 -->
   <script>
     tailwind.config = {
@@ -108,7 +133,7 @@
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-  <div class="container mx-auto px-4 py-8 max-w-6xl">
+  <div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-6xl">
     <!-- 头部 -->
     <header class="mb-8">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between">
