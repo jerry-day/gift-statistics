@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>礼物记录追踪器</title>
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- 统一的 Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3b82f6',
+            secondary: '#6366f1',
+            accent: '#f43f5e',
+            neutral: '#6b7280',
+            'neutral-light': '#f3f4f6',
+            'person1': '#ef4444', // 人物1主色
+            'person2': '#3b82f6', // 人物2主色
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .transition-all-300 {
+        transition: all 0.3s ease;
+      }
+      .card {
+        @apply bg-white rounded-lg shadow-card p-6 transition-all-300;
+      }
+      .card:hover {
+        @apply shadow-card-hover;
+      }
+      .btn {
+        @apply px-4 py-2 rounded-md font-medium transition-all-300 focus:outline-none focus:ring-2 focus:ring-offset-2;
+      }
+      .btn-primary {
+        @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
+      }
+      .btn-secondary {
+        @apply bg-secondary text-white hover:bg-secondary/90 focus:ring-secondary/50;
+      }
+      .btn-accent {
+        @apply bg-accent text-white hover:bg-accent/90 focus:ring-accent/50;
+      }
+      .btn-outline {
+        @apply border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500/50;
+      }
+      .input-field {
+        @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+      }
+      .select-field {
+        @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+      }
+      .badge {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+      }
+      .badge-person1 {
+        @apply bg-person1/10 text-person1;
+      }
+      .badge-person2 {
+        @apply bg-person2/10 text-person2;
+      }
+      .badge-neutral {
+        @apply bg-neutral/10 text-neutral;
+      }
+      .tab {
+        @apply px-4 py-2 font-medium border-b-2 transition-all-300;
+      }
+      .tab-active {
+        @apply border-primary text-primary;
+      }
+      .tab-inactive {
+        @apply border-transparent text-neutral hover:text-primary hover:border-primary/30;
+      }
+      /* Toast样式 */
+      .toast {
+        @apply fixed bottom-4 right-4 px-4 py-3 rounded-md shadow-lg z-50 transition-all duration-300 transform translate-y-0 opacity-100;
+      }
+      .toast-success {
+        @apply bg-green-500 text-white;
+      }
+      .toast-error {
+        @apply bg-red-500 text-white;
+      }
+      .toast-hidden {
+        @apply transform translate-y-10 opacity-0 pointer-events-none;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+    <!-- 头部 -->
+    <header class="mb-8">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-800">礼物记录追踪器</h1>
+          <p class="text-neutral mt-1" id="headerSubtitle">记录并统计小红和小蓝之间的礼物往来</p>
+        </div>
+        <div class="mt-4 md:mt-0 flex gap-3">
+          <!-- 配置按钮 -->
+          <button id="configBtn" class="btn btn-outline flex items-center">
+            <i class="fa fa-cog mr-2"></i> 配置
+          </button>
+          <!-- 云同步按钮 -->
+          <button id="cloudSyncBtn" class="btn btn-secondary flex items-center">
+            <i class="fa fa-cloud mr-2"></i> 云同步
+          </button>
+          <!-- 添加记录按钮 -->
+          <button id="addRecordBtn" class="btn btn-primary flex items-center">
+            <i class="fa fa-plus mr-2"></i> 添加记录
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main>
+      <!-- 标签页导航 -->
+      <div class="border-b border-gray-200 mb-6">
+        <nav class="flex -mb-px">
+          <button class="tab tab-active" data-tab="records">
+            <i class="fa fa-list-alt mr-2"></i> 记录列表
+          </button>
+          <button class="tab tab-inactive" data-tab="statistics">
+            <i class="fa fa-bar-chart mr-2"></i> 年度统计
+          </button>
+        </nav>
+      </div>
+
+      <!-- 标签页内容 -->
+      <div class="tab-content">
+        <!-- 记录列表标签页 -->
+        <div id="records-tab" class="tab-pane active">
+          <!-- 搜索和筛选 -->
+          <div class="card mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label for="searchInput" class="block text-sm font-medium text-gray-700 mb-1">搜索物品</label>
+                <input type="text" id="searchInput" class="input-field" placeholder="输入物品名称搜索...">
+              </div>
+              <div>
+                <label for="filterYear" class="block text-sm font-medium text-gray-700 mb-1">筛选年份</label>
+                <select id="filterYear" class="select-field">
+                  <!-- 年份选项将通过JavaScript动态生成 -->
+                </select>
+              </div>
+              <div>
+                <label for="filterPerson" class="block text-sm font-medium text-gray-700 mb-1">赠送人</label>
+                <select id="filterPerson" class="select-field">
+                  <option value="">全部</option>
+                  <option value="person1" id="filterPerson1">小红</option>
+                  <option value="person2" id="filterPerson2">小蓝</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 记录列表 -->
+          <div class="card">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold text-gray-800">礼物记录</h2>
+              <div class="text-sm text-neutral">
+                共 <span id="recordCount">0</span> 条记录
+              </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">物品</th>
+                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分类</th>
+                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">赠送人</th>
+                    <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">接收人</th>
+                    <th class="px-4 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="recordsTableBody" class="bg-white divide-y divide-gray-200">
+                  <!-- 记录将通过JavaScript动态生成 -->
+                  <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-neutral">暂无记录</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 年度统计标签页 -->
+        <div id="statistics-tab" class="tab-pane hidden">
+          <!-- 统计年份选择 -->
+          <div class="card mb-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+              <h2 class="text-xl font-semibold text-gray-800 mb-4 md:mb-0">年度礼物统计</h2>
+              <div class="flex items-center space-x-4">
+                <div>
+                  <label for="statisticsYear" class="block text-sm font-medium text-gray-700 mb-1">选择年份</label>
+                  <select id="statisticsYear" class="select-field">
+                    <!-- 年份选项将通过JavaScript动态生成 -->
+                  </select>
+                </div>
+                <div class="flex items-end">
+                  <button id="viewStatisticsBtn" class="btn btn-primary h-[42px]">
+                    <i class="fa fa-search mr-2"></i> 查看统计
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 统计结果 -->
+          <div id="statisticsResults" class="hidden">
+            <!-- 统计概览卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <!-- 人物1送给人物2的统计 -->
+              <div class="card border-l-4 border-person1">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="text-lg font-semibold text-gray-800">
+                    <span class="badge badge-person1 mr-2" id="statTitle1">小红 → 小蓝</span>
+                    礼物统计
+                  </h3>
+                  <div class="text-xl font-bold text-person1" id="person1ToPerson2TotalCount">0</div>
+                </div>
+                <div class="text-sm text-neutral mb-2">总花费: <span id="person1ToPerson2TotalAmount" class="font-semibold">¥0</span></div>
+                <div class="h-1 bg-gray-200 rounded-full mb-4">
+                  <div id="person1ToPerson2ProgressBar" class="h-1 bg-person1 rounded-full" style="width: 0%"></div>
+                </div>
+                <div class="text-sm text-neutral">占总礼物比例: <span id="person1ToPerson2Percentage">0%</span></div>
+              </div>
+
+              <!-- 人物2送给人物1的统计 -->
+              <div class="card border-l-4 border-person2">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="text-lg font-semibold text-gray-800">
+                    <span class="badge badge-person2 mr-2" id="statTitle2">小蓝 → 小红</span>
+                    礼物统计
+                  </h3>
+                  <div class="text-xl font-bold text-person2" id="person2ToPerson1TotalCount">0</div>
+                </div>
+                <div class="text-sm text-neutral mb-2">总花费: <span id="person2ToPerson1TotalAmount" class="font-semibold">¥0</span></div>
+                <div class="h-1 bg-gray-200 rounded-full mb-4">
+                  <div id="person2ToPerson1ProgressBar" class="h-1 bg-person2 rounded-full" style="width: 0%"></div>
+                </div>
+                <div class="text-sm text-neutral">占总礼物比例: <span id="person2ToPerson1Percentage">0%</span></div>
+              </div>
+            </div>
+
+            <!-- 分类统计卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <!-- 人物1送给人物2的分类统计 -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  <span class="badge badge-person1 mr-2" id="categoryTitle1">小红 → 小蓝</span>
+                  分类统计
+                </h3>
+                <div id="person1ToPerson2Categories" class="space-y-4">
+                  <!-- 分类统计将通过JavaScript动态生成 -->
+                </div>
+              </div>
+
+              <!-- 人物2送给人物1的分类统计 -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  <span class="badge badge-person2 mr-2" id="categoryTitle2">小蓝 → 小红</span>
+                  分类统计
+                </h3>
+                <div id="person2ToPerson1Categories" class="space-y-4">
+                  <!-- 分类统计将通过JavaScript动态生成 -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 图表 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- 礼物数量对比图表 -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">礼物数量对比</h3>
+                <div class="h-64">
+                  <canvas id="giftCountChart"></canvas>
+                </div>
+              </div>
+
+              <!-- 礼物金额对比图表 -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">礼物金额对比</h3>
+                <div class="h-64">
+                  <canvas id="giftAmountChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 无统计数据提示 -->
+          <div id="noStatisticsData" class="card text-center py-12">
+            <i class="fa fa-bar-chart text-4xl text-neutral mb-4"></i>
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">暂无统计数据</h3>
+            <p class="text-neutral">请选择年份并点击"查看统计"按钮查看年度礼物统计</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 添加记录模态框 -->
+  <div id="addRecordModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">添加礼物记录</h3>
+        <button id="closeModalBtn" class="text-neutral hover:text-gray-700">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <form id="addRecordForm" class="px-6 py-4">
+        <div class="space-y-4">
+          <div>
+            <label for="recordDate" class="block text-sm font-medium text-gray-700 mb-1">日期 <span class="text-red-500">*</span></label>
+            <input type="date" id="recordDate" class="input-field" required>
+          </div>
+          <div>
+            <label for="recordItem" class="block text-sm font-medium text-gray-700 mb-1">物品名称 <span class="text-red-500">*</span></label>
+            <input type="text" id="recordItem" class="input-field" placeholder="输入物品名称..." required>
+          </div>
+          <div>
+            <label for="recordAmount" class="block text-sm font-medium text-gray-700 mb-1">金额 (元)</label>
+            <input type="number" id="recordAmount" class="input-field" placeholder="输入金额，可选..." min="0" step="0.01">
+          </div>
+          <div>
+            <label for="recordCategory" class="block text-sm font-medium text-gray-700 mb-1">分类 <span class="text-red-500">*</span></label>
+            <select id="recordCategory" class="select-field" required>
+              <option value="">请选择分类</option>
+              <option value="衣物">衣物</option>
+              <option value="电子产品">电子产品</option>
+              <option value="食品">食品</option>
+              <option value="甜品">甜品</option>
+              <option value="书籍">书籍</option>
+              <option value="化妆品">化妆品</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div>
+            <label for="recordSender" class="block text-sm font-medium text-gray-700 mb-1">赠送人 <span class="text-red-500">*</span></label>
+            <select id="recordSender" class="select-field" required>
+              <option value="">请选择赠送人</option>
+              <option value="person1" id="senderPerson1">小红</option>
+              <option value="person2" id="senderPerson2">小蓝</option>
+            </select>
+          </div>
+          <div>
+            <label for="recordReceiver" class="block text-sm font-medium text-gray-700 mb-1">接收人 <span class="text-red-500">*</span></label>
+            <select id="recordReceiver" class="select-field" required>
+              <option value="">请选择接收人</option>
+              <option value="person1" id="receiverPerson1">小红</option>
+              <option value="person2" id="receiverPerson2">小蓝</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 mt-6">
+          <button type="button" id="cancelAddRecordBtn" class="btn btn-outline">取消</button>
+          <button type="submit" class="btn btn-primary">保存记录</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 记录详情模态框 -->
+  <div id="recordDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">记录详情</h3>
+        <button id="closeDetailModalBtn" class="text-neutral hover:text-gray-700">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div id="recordDetailContent" class="px-6 py-4">
+        <!-- 记录详情将通过JavaScript动态生成 -->
+      </div>
+      <div class="flex justify-end space-x-3 mt-4 px-6 pb-4 border-t border-gray-200">
+        <button id="closeDetailBtn" class="btn btn-outline">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分类详情模态框 -->
+  <div id="categoryDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 id="categoryDetailTitle" class="text-lg font-semibold text-gray-800">分类详情</h3>
+        <button id="closeCategoryDetailModalBtn" class="text-neutral hover:text-gray-700">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="px-6 py-4">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">物品</th>
+                <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">赠送人</th>
+                <th class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">接收人</th>
+              </tr>
+            </thead>
+            <tbody id="categoryDetailTableBody" class="bg-white divide-y divide-gray-200">
+              <!-- 分类详情将通过JavaScript动态生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-3 mt-4 px-6 pb-4 border-t border-gray-200">
+        <button id="closeCategoryDetailBtn" class="btn btn-outline">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 配置模态框 -->
+  <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">系统配置</h3>
+        <button id="closeConfigModalBtn" class="text-neutral hover:text-gray-700">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <form id="configForm" class="px-6 py-4">
+        <div class="space-y-4">
+          <div>
+            <label for="person1Name" class="block text-sm font-medium text-gray-700 mb-1">人物1名称 <span class="text-red-500">*</span></label>
+            <input type="text" id="person1Name" class="input-field" placeholder="输入第一个人的名字..." required>
+          </div>
+          <div>
+            <label for="person2Name" class="block text-sm font-medium text-gray-700 mb-1">人物2名称 <span class="text-red-500">*</span></label>
+            <input type="text" id="person2Name" class="input-field" placeholder="输入第二个人的名字..." required>
+          </div>
+          <div class="pt-2">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">云同步配置 (GitHub Gist)</h4>
+            <div class="bg-gray-50 p-3 rounded-md text-xs text-neutral mb-3">
+              <p class="mb-1"><i class="fa fa-info-circle mr-1"></i> 如何获取Gist ID和Token：</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>访问 <a href="https://gist.github.com/" target="_blank" class="text-primary hover:underline">Gist</a> 创建新Gist，格式选择JSON</li>
+                <li>复制Gist页面URL中的ID（https://gist.github.com/xxx/<strong>gist-id</strong>）</li>
+                <li>访问 <a href="https://github.com/settings/tokens" target="_blank" class="text-primary hover:underline">GitHub Token</a> 创建token，勾选gist权限</li>
+              </ol>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label for="gistId" class="block text-sm font-medium text-gray-700 mb-1">Gist ID (可选)</label>
+                <input type="text" id="gistId" class="input-field" placeholder="GitHub Gist ID">
+              </div>
+              <div>
+                <label for="githubToken" class="block text-sm font-medium text-gray-700 mb-1">GitHub Token (可选)</label>
+                <input type="password" id="githubToken" class="input-field" placeholder="GitHub Personal Access Token">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 mt-6">
+          <button type="button" id="cancelConfigBtn" class="btn btn-outline">取消</button>
+          <button type="submit" class="btn btn-primary">保存配置</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 云同步模态框 -->
+  <div id="cloudSyncModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-semibold text-gray-800">云同步管理</h3>
+        <button id="closeCloudSyncModalBtn" class="text-neutral hover:text-gray-700">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="px-6 py-4">
+        <div class="space-y-6">
+          <!-- 本地同步 -->
+          <div class="border-b border-gray-200 pb-4">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">本地数据管理</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <button id="exportDataBtn" class="btn btn-outline flex items-center justify-center">
+                <i class="fa fa-download mr-2"></i> 导出JSON
+              </button>
+              <label class="btn btn-outline flex items-center justify-center cursor-pointer">
+                <i class="fa fa-upload mr-2"></i> 导入JSON
+                <input type="file" id="importDataInput" class="hidden" accept=".json">
+              </label>
+            </div>
+            <div class="mt-3">
+              <button id="clearDataBtn" class="btn btn-outline text-red-500 hover:bg-red-50 flex items-center justify-center w-full">
+                <i class="fa fa-trash mr-2"></i> 清空本地数据
+              </button>
+            </div>
+          </div>
+
+          <!-- 云同步 -->
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Gist云同步</h4>
+            <div id="syncNotConfigured" class="text-center py-4 text-neutral">
+              <i class="fa fa-exclamation-circle text-xl mb-2"></i>
+              <p>尚未配置Gist信息，请先在系统配置中填写</p>
+            </div>
+            <div id="syncConfigured" class="hidden grid grid-cols-2 gap-3">
+              <button id="syncToCloudBtn" class="btn btn-secondary flex items-center justify-center">
+                <i class="fa fa-cloud-upload mr-2"></i> 同步到云端
+              </button>
+              <button id="syncFromCloudBtn" class="btn btn-primary flex items-center justify-center">
+                <i class="fa fa-cloud-download mr-2"></i> 从云端同步
+              </button>
+            </div>
+            <div id="syncStatus" class="mt-3 text-xs text-center hidden"></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end px-6 pb-4 border-t border-gray-200">
+        <button id="closeCloudSyncBtn" class="btn btn-outline">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast提示容器 -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 pointer-events-none"></div>
+
+  <script>
+    // 全局配置
+    let appConfig = JSON.parse(localStorage.getItem('giftAppConfig')) || {
+      person1Name: '小红',
+      person2Name: '小蓝',
+      gistId: '',
+      githubToken: ''
+    };
+    
+    // 全局变量
+    let records = JSON.parse(localStorage.getItem('giftRecords')) || [];
+    let currentYear = new Date().getFullYear();
+    let giftCountChart = null;
+    let giftAmountChart = null;
+
+    // 物品分类映射
+    const categoryKeywords = {
+      '衣物': ['衣服', '裤子', '鞋子', '帽子', '围巾', '手套', '袜子', '内衣', '外套', '裙子', '衬衫', 'T恤', '毛衣', '卫衣', '牛仔裤', '短裤', '连衣裙', '夹克', '风衣'],
+      '电子产品': ['手机', '电脑', '平板', '耳机', '音响', '充电器', '充电宝', '鼠标', '键盘', '显示器', '摄像头', '麦克风', '游戏机', '智能手表', '智能手环', '路由器', '硬盘', 'U盘'],
+      '食品': ['零食', '水果', '蔬菜', '肉', '鱼', '米', '面', '油', '盐', '酱', '醋', '茶', '咖啡', '饮料', '牛奶', '酸奶', '巧克力', '饼干', '薯片'],
+      '甜品': ['蛋糕', '冰淇淋', '布丁', '果冻', '糖果', '巧克力', '饼干', '面包', '蛋糕卷', '蛋挞', '泡芙', '马卡龙', '提拉米苏', '芝士蛋糕', '慕斯蛋糕', '冰淇淋', '奶昔', '奶茶', '果汁'],
+      '书籍': ['书', '小说', '教材', '字典', '词典', '杂志', '报纸', '漫画', '绘本', '工具书', '百科全书', '地图', '画册', '笔记本', '日记本'],
+      '化妆品': ['口红', '粉底', '眼影', '腮红', '睫毛膏', '眼线笔', '眉笔', '唇彩', '唇釉', '指甲油', '香水', '护肤品', '面膜', '爽肤水', '乳液', '面霜', '精华', '眼霜', '卸妆水', '洗面奶'],
+    };
+
+    // 初始化应用
+    function initApp() {
+      // 加载配置
+      loadAppConfig();
+      
+      // 设置当前日期为默认值
+      document.getElementById('recordDate').valueAsDate = new Date();
+      
+      // 生成年份选项
+      generateYearOptions();
+      
+      // 渲染记录列表
+      renderRecords();
+      
+      // 更新记录计数
+      updateRecordCount();
+      
+      // 检查云同步配置状态
+      checkCloudSyncConfig();
+      
+      // 绑定事件
+      bindEvents();
+    }
+
+    // 加载应用配置
+    function loadAppConfig() {
+      // 更新页面标题和副标题
+      document.getElementById('headerSubtitle').textContent = 
+        `记录并统计${appConfig.person1Name}和${appConfig.person2Name}之间的礼物往来`;
+      
+      // 更新下拉框选项文本
+      document.getElementById('filterPerson1').textContent = appConfig.person1Name;
+      document.getElementById('filterPerson2').textContent = appConfig.person2Name;
+      
+      document.getElementById('senderPerson1').textContent = appConfig.person1Name;
+      document.getElementById('senderPerson2').textContent = appConfig.person2Name;
+      
+      document.getElementById('receiverPerson1').textContent = appConfig.person1Name;
+      document.getElementById('receiverPerson2').textContent = appConfig.person2Name;
+      
+      // 更新统计标题
+      document.getElementById('statTitle1').textContent = `${appConfig.person1Name} → ${appConfig.person2Name}`;
+      document.getElementById('statTitle2').textContent = `${appConfig.person2Name} → ${appConfig.person1Name}`;
+      
+      document.getElementById('categoryTitle1').textContent = `${appConfig.person1Name} → ${appConfig.person2Name}`;
+      document.getElementById('categoryTitle2').textContent = `${appConfig.person2Name} → ${appConfig.person1Name}`;
+      
+      // 填充配置表单
+      document.getElementById('person1Name').value = appConfig.person1Name;
+      document.getElementById('person2Name').value = appConfig.person2Name;
+      document.getElementById('gistId').value = appConfig.gistId || '';
+      document.getElementById('githubToken').value = appConfig.githubToken || '';
+    }
+
+    // 生成年份选项
+    function generateYearOptions() {
+      const startYear = 2020;
+      const endYear = currentYear + 1;
+      
+      const filterYearSelect = document.getElementById('filterYear');
+      const statisticsYearSelect = document.getElementById('statisticsYear');
+      
+      // 清空现有选项
+      filterYearSelect.innerHTML = '<option value="">全部</option>';
+      statisticsYearSelect.innerHTML = '';
+      
+      // 添加年份选项
+      for (let year = endYear; year >= startYear; year--) {
+        const filterOption = document.createElement('option');
+        filterOption.value = year;
+        filterOption.textContent = year;
+        filterYearSelect.appendChild(filterOption);
+        
+        const statisticsOption = document.createElement('option');
+        statisticsOption.value = year;
+        statisticsOption.textContent = year;
+        if (year === currentYear) {
+          statisticsOption.selected = true;
+        }
+        statisticsYearSelect.appendChild(statisticsOption);
+      }
+    }
+
+    // 检查云同步配置状态
+    function checkCloudSyncConfig() {
+      if (appConfig.gistId && appConfig.githubToken) {
+        document.getElementById('syncNotConfigured').classList.add('hidden');
+        document.getElementById('syncConfigured').classList.remove('hidden');
+      } else {
+        document.getElementById('syncNotConfigured').classList.remove('hidden');
+        document.getElementById('syncConfigured').classList.add('hidden');
+      }
+    }
+
+    // 绑定事件
+    function bindEvents() {
+      // 标签页切换
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const tabId = tab.getAttribute('data-tab');
+          switchTab(tabId);
+        });
+      });
+      
+      // 配置按钮
+      document.getElementById('configBtn').addEventListener('click', () => {
+        document.getElementById('configModal').classList.remove('hidden');
+      });
+      
+      // 关闭配置模态框
+      document.getElementById('closeConfigModalBtn').addEventListener('click', () => {
+        document.getElementById('configModal').classList.add('hidden');
+      });
+      
+      document.getElementById('cancelConfigBtn').addEventListener('click', () => {
+        document.getElementById('configModal').classList.add('hidden');
+      });
+      
+      // 保存配置表单
+      document.getElementById('configForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveAppConfig();
+      });
+      
+      // 云同步按钮
+      document.getElementById('cloudSyncBtn').addEventListener('click', () => {
+        document.getElementById('cloudSyncModal').classList.remove('hidden');
+      });
+      
+      // 关闭云同步模态框
+      document.getElementById('closeCloudSyncModalBtn').addEventListener('click', () => {
+        document.getElementById('cloudSyncModal').classList.add('hidden');
+      });
+      
+      document.getElementById('closeCloudSyncBtn').addEventListener('click', () => {
+        document.getElementById('cloudSyncModal').classList.add('hidden');
+      });
+      
+      // 导出数据
+      document.getElementById('exportDataBtn').addEventListener('click', exportData);
+      
+      // 导入数据
+      document.getElementById('importDataInput').addEventListener('change', importData);
+      
+      // 清空数据
+      document.getElementById('clearDataBtn').addEventListener('click', clearLocalData);
+      
+      // 同步到云端
+      document.getElementById('syncToCloudBtn').addEventListener('click', syncToCloud);
+      
+      // 从云端同步
+      document.getElementById('syncFromCloudBtn').addEventListener('click', syncFromCloud);
+      
+      // 添加记录按钮
+      document.getElementById('addRecordBtn').addEventListener('click', () => {
+        document.getElementById('addRecordModal').classList.remove('hidden');
+      });
+      
+      // 关闭模态框按钮
+      document.getElementById('closeModalBtn').addEventListener('click', () => {
+        document.getElementById('addRecordModal').classList.add('hidden');
+      });
+      
+      document.getElementById('cancelAddRecordBtn').addEventListener('click', () => {
+        document.getElementById('addRecordModal').classList.add('hidden');
+      });
+      
+      // 关闭详情模态框按钮
+      document.getElementById('closeDetailModalBtn').addEventListener('click', () => {
+        document.getElementById('recordDetailModal').classList.add('hidden');
+      });
+      
+      document.getElementById('closeDetailBtn').addEventListener('click', () => {
+        document.getElementById('recordDetailModal').classList.add('hidden');
+      });
+      
+      // 关闭分类详情模态框按钮
+      document.getElementById('closeCategoryDetailModalBtn').addEventListener('click', () => {
+        document.getElementById('categoryDetailModal').classList.add('hidden');
+      });
+      
+      document.getElementById('closeCategoryDetailBtn').addEventListener('click', () => {
+        document.getElementById('categoryDetailModal').classList.add('hidden');
+      });
+      
+      // 添加记录表单提交
+      document.getElementById('addRecordForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addRecord();
+      });
+      
+      // 物品名称输入自动分类
+      document.getElementById('recordItem').addEventListener('input', () => {
+        autoClassify();
+      });
+      
+      // 赠送人选择后自动设置接收人
+      document.getElementById('recordSender').addEventListener('change', () => {
+        const sender = document.getElementById('recordSender').value;
+        const receiverSelect = document.getElementById('recordReceiver');
+        
+        if (sender === 'person1') {
+          receiverSelect.value = 'person2';
+        } else if (sender === 'person2') {
+          receiverSelect.value = 'person1';
+        } else {
+          receiverSelect.value = '';
+        }
+      });
+      
+      // 搜索和筛选
+      document.getElementById('searchInput').addEventListener('input', () => {
+        renderRecords();
+      });
+      
+      document.getElementById('filterYear').addEventListener('change', () => {
+        renderRecords();
+      });
+      
+      document.getElementById('filterPerson').addEventListener('change', () => {
+        renderRecords();
+      });
+      
+      // 查看统计按钮
+      document.getElementById('viewStatisticsBtn').addEventListener('click', () => {
+        const year = document.getElementById('statisticsYear').value;
+        generateStatistics(year);
+      });
+    }
+
+    // 保存应用配置
+    function saveAppConfig() {
+      appConfig.person1Name = document.getElementById('person1Name').value.trim();
+      appConfig.person2Name = document.getElementById('person2Name').value.trim();
+      appConfig.gistId = document.getElementById('gistId').value.trim();
+      appConfig.githubToken = document.getElementById('githubToken').value.trim();
+      
+      // 保存到本地存储
+      localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
+      
+      // 重新加载配置
+      loadAppConfig();
+      
+      // 检查云同步配置
+      checkCloudSyncConfig();
+      
+      // 关闭模态框
+      document.getElementById('configModal').classList.add('hidden');
+      
+      // 刷新记录列表
+      renderRecords();
+      
+      // 显示成功提示
+      showToast('配置保存成功！');
+    }
+
+    // 导出数据
+    function exportData() {
+      const exportData = {
+        config: appConfig,
+        records: records,
+        exportTime: new Date().toISOString()
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `礼物记录_${currentYear}_${new Date().getTime()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+      
+      showToast('数据导出成功！');
+    }
+
+    // 导入数据
+    function importData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const importedData = JSON.parse(event.target.result);
+          
+          // 确认导入选项
+          const confirmMsg = `
+            检测到导入数据包含：
+            • 配置信息：${importedData.config ? '有' : '无'}
+            • 记录数量：${importedData.records ? importedData.records.length : 0}条
+            
+            选择导入方式：
+            1. 覆盖现有数据（会删除当前所有记录和配置）
+            2. 仅合并记录（保留现有配置，新增记录）
+            3. 仅更新配置（保留现有记录，更新配置）
+          `;
+          
+          const choice = prompt(confirmMsg + '\n\n请输入 1/2/3 选择导入方式：', '1');
+          
+          if (!choice || !['1', '2', '3'].includes(choice)) {
+            showToast('导入已取消');
+            return;
+          }
+          
+          let newRecords = [];
+          if (choice === '1') {
+            // 覆盖所有数据
+            if (importedData.config) {
+              appConfig = importedData.config;
+              localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
+            }
+            if (importedData.records) {
+              records = importedData.records;
+              localStorage.setItem('giftRecords', JSON.stringify(records));
+            }
+            loadAppConfig();
+          } else if (choice === '2') {
+            // 仅合并记录
+            if (importedData.records && Array.isArray(importedData.records)) {
+              // 去重合并（按ID）
+              const existingIds = new Set(records.map(r => r.id));
+              newRecords = importedData.records.filter(r => !existingIds.has(r.id));
+              records = [...records, ...newRecords];
+              localStorage.setItem('giftRecords', JSON.stringify(records));
+            }
+          } else if (choice === '3') {
+            // 仅更新配置
+            if (importedData.config) {
+              appConfig = importedData.config;
+              localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
+              loadAppConfig();
+            }
+          }
+          
+          // 刷新界面
+          renderRecords();
+          updateRecordCount();
+          checkCloudSyncConfig();
+          
+          showToast(`数据导入成功！${choice === '2' ? `新增${newRecords.length}条记录` : ''}`);
+          
+        } catch (error) {
+          showToast('导入失败：文件格式错误', 'error');
+          console.error('导入数据错误：', error);
+        }
+        
+        // 清空文件输入
+        document.getElementById('importDataInput').value = '';
+      };
+      
+      reader.readAsText(file);
+    }
+
+    // 清空本地数据
+    function clearLocalData() {
+      if (!confirm(`确定要清空所有本地数据吗？\n此操作不可恢复！`)) return;
+      
+      // 清空记录
+      records = [];
+      localStorage.removeItem('giftRecords');
+      
+      // 重置配置为默认
+      appConfig = {
+        person1Name: '小红',
+        person2Name: '小蓝',
+        gistId: '',
+        githubToken: ''
+      };
+      localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
+      
+      // 刷新界面
+      loadAppConfig();
+      renderRecords();
+      updateRecordCount();
+      checkCloudSyncConfig();
+      
+      showToast('本地数据已清空！');
+    }
+
+    // 同步到云端(Gist)
+    async function syncToCloud() {
+      if (!appConfig.gistId || !appConfig.githubToken) {
+        showToast('请先配置Gist ID和Token', 'error');
+        return;
+      }
+      
+      const syncStatus = document.getElementById('syncStatus');
+      syncStatus.className = 'mt-3 text-xs text-center text-primary';
+      syncStatus.textContent = '正在同步到云端...';
+      syncStatus.classList.remove('hidden');
+      
+      try {
+        const syncData = {
+          config: appConfig,
+          records: records,
+          syncTime: new Date().toISOString(),
+          version: '1.0'
+        };
+        
+        // 更新Gist
+        const response = await fetch(`https://api.github.com/gists/${appConfig.gistId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `token ${appConfig.githubToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            files: {
+              'gift_records.json': {
+                content: JSON.stringify(syncData, null, 2)
+              }
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        syncStatus.className = 'mt-3 text-xs text-center text-green-600';
+        syncStatus.textContent = '同步到云端成功！';
+        
+        showToast('数据已同步到云端！');
+        
+      } catch (error) {
+        syncStatus.className = 'mt-3 text-xs text-center text-red-600';
+        syncStatus.textContent = `同步失败：${error.message}`;
+        
+        showToast('同步到云端失败！', 'error');
+        console.error('同步到云端错误：', error);
+      }
+      
+      // 3秒后清空状态
+      setTimeout(() => {
+        syncStatus.classList.add('hidden');
+      }, 3000);
+    }
+
+    // 从云端同步(Gist)
+    async function syncFromCloud() {
+      if (!appConfig.gistId || !appConfig.githubToken) {
+        showToast('请先配置Gist ID和Token', 'error');
+        return;
+      }
+      
+      const syncStatus = document.getElementById('syncStatus');
+      syncStatus.className = 'mt-3 text-xs text-center text-primary';
+      syncStatus.textContent = '正在从云端同步...';
+      syncStatus.classList.remove('hidden');
+      
+      try {
+        // 获取Gist内容
+        const response = await fetch(`https://api.github.com/gists/${appConfig.gistId}`, {
+          headers: {
+            'Authorization': `token ${appConfig.githubToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const gistData = await response.json();
+        const fileContent = gistData.files['gift_records.json']?.content;
+        
+        if (!fileContent) {
+          throw new Error('Gist中未找到gift_records.json文件');
+        }
+        
+        const cloudData = JSON.parse(fileContent);
+        
+        // 确认同步选项
+        const confirmMsg = `
+          从云端获取到数据：
+          • 最后同步时间：${cloudData.syncTime || '未知'}
+          • 记录数量：${cloudData.records ? cloudData.records.length : 0}条
+          
+          选择同步方式：
+          1. 覆盖本地数据（会删除当前所有记录和配置）
+          2. 仅合并记录（保留本地配置，新增云端记录）
+          3. 仅更新配置（保留本地记录，更新为云端配置）
+        `;
+        
+        const choice = prompt(confirmMsg + '\n\n请输入 1/2/3 选择同步方式：', '1');
+        
+        if (!choice || !['1', '2', '3'].includes(choice)) {
+          syncStatus.textContent = '同步已取消';
+          setTimeout(() => syncStatus.classList.add('hidden'), 3000);
+          return;
+        }
+        
+        let newRecords = [];
+        if (choice === '1') {
+          // 覆盖所有数据
+          if (cloudData.config) {
+            appConfig = cloudData.config;
+            localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
+          }
+          if (cloudData.records) {
+            records = cloudData.records;
+            localStorage.setItem('giftRecords', JSON.stringify(records));
+          }
+          loadAppConfig();
+        } else if (choice === '2') {
+          // 仅合并记录
+          if (cloudData.records && Array.isArray(cloudData.records)) {
+            const existingIds = new Set(records.map(r => r.id));
+            newRecords = cloudData.records.filter(r => !existingIds.has(r.id));
+            records = [...records, ...newRecords];
+            localStorage.setItem('giftRecords', JSON.stringify(records));
+          }
+        } else if (choice === '3') {
+          // 仅更新配置
+          if (cloudData.config) {
+            appConfig = cloudData.config;
+            localStorage.setItem('giftAppConfig', JSON.stringify(appConfig));
+            loadAppConfig();
+          }
+        }
+        
+        // 刷新界面
+        renderRecords();
+        updateRecordCount();
+        checkCloudSyncConfig();
+        
+        syncStatus.className = 'mt-3 text-xs text-center text-green-600';
+        syncStatus.textContent = `同步成功！${choice === '2' ? `新增${newRecords.length}条记录` : '已更新本地数据'}`;
+        
+        showToast('已从云端同步数据！');
+        
+      } catch (error) {
+        syncStatus.className = 'mt-3 text-xs text-center text-red-600';
+        syncStatus.textContent = `同步失败：${error.message}`;
+        
+        showToast('从云端同步失败！', 'error');
+        console.error('从云端同步错误：', error);
+      }
+      
+      // 3秒后清空状态
+      setTimeout(() => {
+        syncStatus.classList.add('hidden');
+      }, 3000);
+    }
+
+    // 标签页切换
+    function switchTab(tabId) {
+      // 更新标签页状态
+      document.querySelectorAll('.tab').forEach(tab => {
+        if (tab.getAttribute('data-tab') === tabId) {
+          tab.classList.remove('tab-inactive');
+          tab.classList.add('tab-active');
+        } else {
+          tab.classList.remove('tab-active');
+          tab.classList.add('tab-inactive');
+        }
+      });
+      
+      // 更新标签页内容
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.add('hidden');
+      });
+      
+      document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+      
+      // 如果切换到统计标签页，自动生成当前年份的统计
+      if (tabId === 'statistics') {
+        const year = document.getElementById('statisticsYear').value;
+        generateStatistics(year);
+      }
+    }
+
+    // 自动分类
+    function autoClassify() {
+      const itemName = document.getElementById('recordItem').value.trim().toLowerCase();
+      const categorySelect = document.getElementById('recordCategory');
+      
+      if (!itemName) {
+        categorySelect.value = '';
+        return;
+      }
+      
+      for (const [category, keywords] of Object.entries(categoryKeywords)) {
+        for (const keyword of keywords) {
+          if (itemName.includes(keyword.toLowerCase())) {
+            categorySelect.value = category;
+            return;
+          }
+        }
+      }
+      
+      categorySelect.value = '其他';
+    }
+
+    // 添加记录
+    function addRecord() {
+      const date = document.getElementById('recordDate').value;
+      const item = document.getElementById('recordItem').value.trim();
+      const amount = document.getElementById('recordAmount').value ? parseFloat(document.getElementById('recordAmount').value) : 0;
+      const category = document.getElementById('recordCategory').value;
+      const senderKey = document.getElementById('recordSender').value; // person1/person2
+      const receiverKey = document.getElementById('recordReceiver').value; // person1/person2
+      
+      // 转换为实际人名
+      const sender = senderKey === 'person1' ? appConfig.person1Name : appConfig.person2Name;
+      const receiver = receiverKey === 'person1' ? appConfig.person1Name : appConfig.person2Name;
+      
+      // 创建记录对象
+      const record = {
+        id: Date.now().toString(),
+        date,
+        item,
+        amount,
+        category,
+        sender,
+        receiver,
+        senderKey, // 保留key用于筛选
+        receiverKey, // 保留key用于筛选
+        createdAt: new Date().toISOString()
+      };
+      
+      // 添加到记录数组
+      records.push(record);
+      
+      // 保存到本地存储
+      localStorage.setItem('giftRecords', JSON.stringify(records));
+      
+      // 重新渲染记录列表
+      renderRecords();
+      
+      // 更新记录计数
+      updateRecordCount();
+      
+      // 重置表单
+      document.getElementById('addRecordForm').reset();
+      document.getElementById('recordDate').valueAsDate = new Date();
+      
+      // 关闭模态框
+      document.getElementById('addRecordModal').classList.add('hidden');
+      
+      // 显示成功提示
+      showToast('记录添加成功！');
+    }
+
+    // 渲染记录列表
+    function renderRecords() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const filterYear = document.getElementById('filterYear').value;
+      const filterPersonKey = document.getElementById('filterPerson').value; // person1/person2/''
+      
+      // 筛选记录
+      let filteredRecords = records;
+      
+      if (searchTerm) {
+        filteredRecords = filteredRecords.filter(record => 
+          record.item.toLowerCase().includes(searchTerm)
+        );
+      }
+      
+      if (filterYear) {
+        filteredRecords = filteredRecords.filter(record => 
+          record.date.startsWith(filterYear)
+        );
+      }
+      
+      if (filterPersonKey) {
+        filteredRecords = filteredRecords.filter(record => 
+          record.senderKey === filterPersonKey
+        );
+      }
+      
+      // 按日期降序排序
+      filteredRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      // 渲染记录
+      const tableBody = document.getElementById('recordsTableBody');
+      tableBody.innerHTML = '';
+      
+      if (filteredRecords.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="7" class="px-4 py-8 text-center text-neutral">暂无记录</td>';
+        tableBody.appendChild(row);
+        return;
+      }
+      
+      filteredRecords.forEach(record => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 transition-all-300';
+        
+        // 格式化日期
+        const formattedDate = formatDate(record.date);
+        
+        // 格式化金额
+        const formattedAmount = record.amount > 0 ? `¥${record.amount.toFixed(2)}` : '-';
+        
+        // 设置赠送人和接收人的样式
+        const senderBadge = record.senderKey === 'person1' ? 
+          '<span class="badge badge-person1">' + record.sender + '</span>' : 
+          '<span class="badge badge-person2">' + record.sender + '</span>';
+        
+        const receiverBadge = record.receiverKey === 'person1' ? 
+          '<span class="badge badge-person1">' + record.receiver + '</span>' : 
+          '<span class="badge badge-person2">' + record.receiver + '</span>';
+        
+        row.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap">${formattedDate}</td>
+          <td class="px-4 py-3">
+            <div class="font-medium text-gray-900">${record.item}</div>
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">${formattedAmount}</td>
+          <td class="px-4 py-3">
+            <span class="badge badge-neutral">${record.category}</span>
+          </td>
+          <td class="px-4 py-3">${senderBadge}</td>
+          <td class="px-4 py-3">${receiverBadge}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+            <button class="text-primary hover:text-primary/80 mr-3" onclick="viewRecordDetail('${record.id}')">
+              <i class="fa fa-eye"></i>
+            </button>
+            <button class="text-red-500 hover:text-red-600" onclick="deleteRecord('${record.id}')">
+              <i class="fa fa-trash"></i>
+            </button>
+          </td>
+        `;
+        
+        tableBody.appendChild(row);
+      });
+    }
+
+    // 更新记录计数
+    function updateRecordCount() {
+      document.getElementById('recordCount').textContent = records.length;
+    }
+
+    // 查看记录详情
+    function viewRecordDetail(recordId) {
+      const record = records.find(r => r.id === recordId);
+      
+      if (!record) return;
+      
+      const detailContent = document.getElementById('recordDetailContent');
+      
+      // 格式化日期
+      const formattedDate = formatDate(record.date);
+      
+      // 格式化金额
+      const formattedAmount = record.amount > 0 ? `¥${record.amount.toFixed(2)}` : '-';
+      
+      // 设置赠送人和接收人的样式
+      const senderColor = record.senderKey === 'person1' ? 'text-person1' : 'text-person2';
+      const receiverColor = record.receiverKey === 'person1' ? 'text-person1' : 'text-person2';
+      
+      detailContent.innerHTML = `
+        <div class="space-y-4">
+          <div>
+            <div class="text-sm text-neutral mb-1">日期</div>
+            <div class="font-medium">${formattedDate}</div>
+          </div>
+          <div>
+            <div class="text-sm text-neutral mb-1">物品名称</div>
+            <div class="font-medium">${record.item}</div>
+          </div>
+          <div>
+            <div class="text-sm text-neutral mb-1">金额</div>
+            <div class="font-medium">${formattedAmount}</div>
+          </div>
+          <div>
+            <div class="text-sm text-neutral mb-1">分类</div>
+            <div class="badge badge-neutral">${record.category}</div>
+          </div>
+          <div>
+            <div class="text-sm text-neutral mb-1">赠送人</div>
+            <div class="font-medium ${senderColor}">${record.sender}</div>
+          </div>
+          <div>
+            <div class="text-sm text-neutral mb-1">接收人</div>
+            <div class="font-medium ${receiverColor}">${record.receiver}</div>
+          </div>
+          <div>
+            <div class="text-sm text-neutral mb-1">添加时间</div>
+            <div class="font-medium">${formatDateTime(record.createdAt)}</div>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('recordDetailModal').classList.remove('hidden');
+    }
+
+    // 删除记录
+    function deleteRecord(recordId) {
+      if (!confirm('确定要删除这条记录吗？')) return;
+      
+      records = records.filter(r => r.id !== recordId);
+      
+      // 保存到本地存储
+      localStorage.setItem('giftRecords', JSON.stringify(records));
+      
+      // 重新渲染记录列表
+      renderRecords();
+      
+      // 更新记录计数
+      updateRecordCount();
+      
+      // 显示成功提示
+      showToast('记录已删除！');
+    }
+
+    // 生成统计
+    function generateStatistics(year) {
+      // 筛选指定年份的记录
+      const yearRecords = records.filter(record => record.date.startsWith(year));
+      
+      if (yearRecords.length === 0) {
+        document.getElementById('statisticsResults').classList.add('hidden');
+        document.getElementById('noStatisticsData').classList.remove('hidden');
+        return;
+      }
+      
+      document.getElementById('statisticsResults').classList.remove('hidden');
+      document.getElementById('noStatisticsData').classList.add('hidden');
+      
+      // 按赠送人和分类分组统计
+      const person1ToPerson2Records = yearRecords.filter(record => 
+        record.senderKey === 'person1' && record.receiverKey === 'person2'
+      );
+      const person2ToPerson1Records = yearRecords.filter(record => 
+        record.senderKey === 'person2' && record.receiverKey === 'person1'
+      );
+      
+      // 计算总数和总金额
+      const person1ToPerson2TotalCount = person1ToPerson2Records.length;
+      const person2ToPerson1TotalCount = person2ToPerson1Records.length;
+      const totalCount = person1ToPerson2TotalCount + person2ToPerson1TotalCount;
+      
+      const person1ToPerson2TotalAmount = person1ToPerson2Records.reduce((sum, record) => sum + record.amount, 0);
+      const person2ToPerson1TotalAmount = person2ToPerson1Records.reduce((sum, record) => sum + record.amount, 0);
+      const totalAmount = person1ToPerson2TotalAmount + person2ToPerson1TotalAmount;
+      
+      // 计算百分比
+      const person1ToPerson2Percentage = totalCount > 0 ? Math.round((person1ToPerson2TotalCount / totalCount) * 100) : 0;
+      const person2ToPerson1Percentage = totalCount > 0 ? Math.round((person2ToPerson1TotalCount / totalCount) * 100) : 0;
+      
+      // 更新统计概览
+      document.getElementById('person1ToPerson2TotalCount').textContent = person1ToPerson2TotalCount;
+      document.getElementById('person2ToPerson1TotalCount').textContent = person2ToPerson1TotalCount;
+      
+      document.getElementById('person1ToPerson2TotalAmount').textContent = `¥${person1ToPerson2TotalAmount.toFixed(2)}`;
+      document.getElementById('person2ToPerson1TotalAmount').textContent = `¥${person2ToPerson1TotalAmount.toFixed(2)}`;
+      
+      document.getElementById('person1ToPerson2ProgressBar').style.width = `${person1ToPerson2Percentage}%`;
+      document.getElementById('person2ToPerson1ProgressBar').style.width = `${person2ToPerson1Percentage}%`;
+      
+      document.getElementById('person1ToPerson2Percentage').textContent = `${person1ToPerson2Percentage}%`;
+      document.getElementById('person2ToPerson1Percentage').textContent = `${person2ToPerson1Percentage}%`;
+      
+      // 按分类统计
+      const person1ToPerson2Categories = groupByCategory(person1ToPerson2Records);
+      const person2ToPerson1Categories = groupByCategory(person2ToPerson1Records);
+      
+      // 渲染分类统计
+      renderCategoryStatistics('person1ToPerson2Categories', person1ToPerson2Categories, appConfig.person1Name, appConfig.person2Name);
+      renderCategoryStatistics('person2ToPerson1Categories', person2ToPerson1Categories, appConfig.person2Name, appConfig.person1Name);
+      
+      // 生成图表
+      generateCharts(person1ToPerson2TotalCount, person2ToPerson1TotalCount, person1ToPerson2TotalAmount, person2ToPerson1TotalAmount);
+    }
+
+    // 按分类分组统计
+    function groupByCategory(records) {
+      const categories = {};
+      
+      records.forEach(record => {
+        if (!categories[record.category]) {
+          categories[record.category] = {
+            count: 0,
+            amount: 0,
+            items: []
+          };
+        }
+        
+        categories[record.category].count++;
+        categories[record.category].amount += record.amount;
+        categories[record.category].items.push(record);
+      });
+      
+      return categories;
+    }
+
+    // 渲染分类统计
+    function renderCategoryStatistics(containerId, categories, sender, receiver) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      
+      if (Object.keys(categories).length === 0) {
+        container.innerHTML = '<div class="text-neutral text-center py-4">暂无记录</div>';
+        return;
+      }
+      
+      // 按数量降序排序
+      const sortedCategories = Object.entries(categories).sort((a, b) => b[1].count - a[1].count);
+      
+      sortedCategories.forEach(([category, data]) => {
+        const categoryElement = document.createElement('div');
+        categoryElement.className = 'bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition-all-300';
+        
+        categoryElement.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div class="flex items-center">
+              <span class="badge badge-neutral mr-2">${category}</span>
+              <span class="text-sm text-neutral">${data.count} 件</span>
+            </div>
+            <div class="text-sm font-medium">¥${data.amount.toFixed(2)}</div>
+          </div>
+        `;
+        
+        // 点击查看分类详情
+        categoryElement.addEventListener('click', () => {
+          showCategoryDetail(category, data.items, sender, receiver);
+        });
+        
+        container.appendChild(categoryElement);
+      });
+    }
+
+    // 显示分类详情
+    function showCategoryDetail(category, items, sender, receiver) {
+      const modalTitle = document.getElementById('categoryDetailTitle');
+      const tableBody = document.getElementById('categoryDetailTableBody');
+      
+      modalTitle.textContent = `${category} 分类详情`;
+      tableBody.innerHTML = '';
+      
+      // 按日期降序排序
+      items.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 transition-all-300';
+        
+        const formattedDate = formatDate(item.date);
+        const formattedAmount = item.amount > 0 ? `¥${item.amount.toFixed(2)}` : '-';
+        
+        row.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap">${formattedDate}</td>
+          <td class="px-4 py-3">${item.item}</td>
+          <td class="px-4 py-3 whitespace-nowrap">${formattedAmount}</td>
+          <td class="px-4 py-3">${item.sender}</td>
+          <td class="px-4 py-3">${item.receiver}</td>
+        `;
+        
+        tableBody.appendChild(row);
+      });
+      
+      document.getElementById('categoryDetailModal').classList.remove('hidden');
+    }
+    
+    // 格式化日期
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    // 格式化日期时间
+    function formatDateTime(dateTimeString) {
+      const date = new Date(dateTimeString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+    
+    // 生成图表
+    function generateCharts(person1ToPerson2Count, person2ToPerson1Count, person1ToPerson2Amount, person2ToPerson1Amount) {
+      // 销毁现有图表
+      if (giftCountChart) {
+        giftCountChart.destroy();
+      }
+      if (giftAmountChart) {
+        giftAmountChart.destroy();
+      }
+      
+      // 礼物数量对比图表
+      const countCtx = document.getElementById('giftCountChart').getContext('2d');
+      giftCountChart = new Chart(countCtx, {
+        type: 'doughnut',
+        data: {
+          labels: [appConfig.person1Name + ' → ' + appConfig.person2Name, appConfig.person2Name + ' → ' + appConfig.person1Name],
+          datasets: [{
+            data: [person1ToPerson2Count, person2ToPerson1Count],
+            backgroundColor: ['#ef4444', '#3b82f6'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = ((value / total) * 100).toFixed(1) + '%';
+                  return `${label}: ${value} 件 (${percentage})`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // 礼物金额对比图表
+      const amountCtx = document.getElementById('giftAmountChart').getContext('2d');
+      giftAmountChart = new Chart(amountCtx, {
+        type: 'doughnut',
+        data: {
+          labels: [appConfig.person1Name + ' → ' + appConfig.person2Name, appConfig.person2Name + ' → ' + appConfig.person1Name],
+          datasets: [{
+            data: [person1ToPerson2Amount, person2ToPerson1Amount],
+            backgroundColor: ['#ef4444', '#3b82f6'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = ((value / total) * 100).toFixed(1) + '%';
+                  return `${label}: ¥${value.toFixed(2)} (${percentage})`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // 显示提示信息
+    function showToast(message, type = 'success') {
+      const toastContainer = document.getElementById('toastContainer');
+      
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerHTML = `<i class="fa fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} mr-2"></i>${message}`;
+      
+      toastContainer.appendChild(toast);
+      
+      // 3秒后自动移除
+      setTimeout(() => {
+        toast.classList.add('toast-hidden');
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+          }
+        }, 300);
+      }, 3000);
+    }
+    
+    // 页面加载完成后初始化应用
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
